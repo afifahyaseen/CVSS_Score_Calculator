@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CVSS Base Score Calculator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body { 
+            font-family: 'Poppins', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; 
+            background: #ffffff; 
+            color: #15202B; 
+            padding: 24px; 
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 24px 0 16px 0;
+            border-bottom: 2px solid #ECEFF1;
+            margin-bottom: 20px;
+        }
+
+        .title {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .title .logo {
+            width: 44px; height: 44px; border-radius: 12px;
+            background: linear-gradient(135deg, #00B894 0%, #00CEC9 100%);
+            box-shadow: 0 10px 20px rgba(0, 206, 201, 0.25);
+        }
+
+        .title h1 { font-size: 28px; font-weight: 700; letter-spacing: 0.3px; }
+        .subtitle { color: #546E7A; font-weight: 400; }
+
+        /* Layout: strong horizontal split */
+        .content {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr; /* wider form, compact results */
+            gap: 24px;
+        }
+
+        /* Card base */
+        .card {
+            background: #fff;
+            border: 1px solid #E0E0E0;
+            border-radius: 14px;
+            box-shadow: 0 6px 18px rgba(2, 136, 209, 0.06);
+        }
+
+        /* Form card with accent top border */
+        .form-section {
+            padding: 22px 22px 14px 22px;
+            border-top: 5px solid #00B894; /* teal accent */
+        }
+
+        .metric-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+
+        .metric-group h3 { font-size: 14px; color: #263238; margin-bottom: 10px; font-weight: 600; }
+
+        .metric-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+
+        .option { position: relative; }
+        .option input[type="radio"] { display: none; }
+
+        /* Noticeably different option styling (no purple/blue) */
+        .option label {
+            display: block; text-align: center; padding: 12px 10px; border-radius: 10px;
+            border: 2px solid #E0E0E0; color: #263238; font-weight: 500; background: #FAFAFA;
+            transition: .2s ease; cursor: pointer;
+        }
+        .option label:hover { border-color: #00CEC9; background: #F0FFFD; }
+        .option input[type="radio"]:checked + label {
+            border-color: #00B894; background: #E7FFF7; color: #00695C; box-shadow: 0 6px 16px rgba(0, 184, 148, .18);
+        }
+        .description { font-size: 12px; color: #607D8B; margin-top: 4px; }
+
+        .actions { margin-top: 8px; }
+        .calculate-btn {
+            width: 100%; padding: 14px 18px; border-radius: 12px; border: 0; color: #fff; font-weight: 700; letter-spacing: .5px;
+            background: linear-gradient(135deg, #FF8F00 0%, #FFA726 100%); /* orange gradient */
+            box-shadow: 0 10px 20px rgba(255, 167, 38, .25); cursor: pointer; transition: transform .12s ease;
+        }
+        .calculate-btn:hover { transform: translateY(-1px); }
+        .calculate-btn:disabled { opacity: .6; cursor: not-allowed; }
+
+        /* Results card on the right */
+        .results-section { padding: 22px; border-top: 5px solid #FFA726; }
+
+        .score { display: flex; align-items: center; justify-content: space-between; }
+        .score-value { font-size: 48px; font-weight: 800; color: #263238; }
+        .severity-badge {
+            padding: 8px 14px; border-radius: 999px; font-weight: 700; font-size: 12px; letter-spacing: .6px; color: #fff;
+            box-shadow: 0 8px 18px rgba(0,0,0,.08);
+        }
+        .severity-none { background: #90A4AE; }
+        .severity-low { background: #26A69A; }
+        .severity-medium { background: #FB8C00; }
+        .severity-high { background: #EF5350; }
+        .severity-critical { background: #5D4037; }
+
+        .scores-grid {
+            margin-top: 16px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+        }
+        .score-card {
+            padding: 12px; border-radius: 10px; background: #FAFAFA; border: 1px solid #ECEFF1;
+        }
+        .score-card h4 { font-size: 12px; color: #546E7A; margin-bottom: 6px; }
+        .score-card .val { font-size: 20px; font-weight: 700; color: #263238; }
+
+        .vector-string { margin-top: 14px; background: #ECEFF1; padding: 12px; border-radius: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; color: #263238; }
+
+        .loading, .error-message { margin-top: 12px; text-align: center; }
+        .error-message { background: #EF5350; color: #fff; padding: 10px; border-radius: 8px; }
+
+        @media (max-width: 980px) {
+            .content { grid-template-columns: 1fr; }
+            .score { flex-direction: column; align-items: flex-start; gap: 8px; }
+            .scores-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="title">
+                <div class="logo"></div>
+                <div>
+                    <h1>CVSS Base Score Calculator</h1>
+                    <div class="subtitle">Modern, compact and horizontal layout</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- Left: Form -->
+            <div class="card form-section">
+                <form id="cvssForm">
+                    <div class="metric-row">
+                        <div class="metric-group">
+                            <h3>Attack Vector (AV)</h3>
+                            <div class="metric-options">
+                                <div class="option">
+                                    <input type="radio" id="av_n" name="attack_vector" value="N">
+                                    <label for="av_n">Network (N)<div class="description">Remotely exploitable</div></label>
+                                </div>
+                                <div class="option">
+                                    <input type="radio" id="av_a" name="attack_vector" value="A">
+                                    <label for="av_a">Adjacent (A)<div class="description">Adjacent network</div></label>
+                                </div>
+                                <div class="option">
+                                    <input type="radio" id="av_l" name="attack_vector" value="L">
+                                    <label for="av_l">Local (L)<div class="description">Local access</div></label>
+                                </div>
+                                <div class="option">
+                                    <input type="radio" id="av_p" name="attack_vector" value="P">
+                                    <label for="av_p">Physical (P)<div class="description">Physical access</div></label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="metric-group">
+                            <h3>Attack Complexity (AC)</h3>
+                            <div class="metric-options">
+                                <div class="option">
+                                    <input type="radio" id="ac_l" name="attack_complexity" value="L">
+                                    <label for="ac_l">Low (L)<div class="description">No special conditions</div></label>
+                                </div>
+                                <div class="option">
+                                    <input type="radio" id="ac_h" name="attack_complexity" value="H">
+                                    <label for="ac_h">High (H)<div class="description">Special conditions</div></label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="metric-row">
+                        <div class="metric-group">
+                            <h3>Privileges Required (PR)</h3>
+                            <div class="metric-options">
+                                <div class="option">
+                                    <input type="radio" id="pr_n" name="privileges_required" value="N">
+                                    <label for="pr_n">None (N)<div class="description">No privileges</div></label>
+                                </div>
+                                <div class="option">
+                                    <input type="radio" id="pr_l" name="privileges_required" value="L">
+                                    <label for="pr_l">Low (L)<div class="description">Basic privileges</div></label>
+                                </div>
+                                <div class="option">
+                                    <input type="radio" id="pr_h" name="privileges_required" value="H">
+                                    <label for="pr_h">High (H)<div class="description">Admin privileges</div></label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="metric-group">
+                            <h3>User Interaction (UI)</h3>
+                            <div class="metric-options">
+                                <div class="option">
+                                    <input type="radio" id="ui_n" name="user_interaction" value="N">
+                                    <label for="ui_n">None (N)<div class="description">No interaction</div></label>
+                                </div>
+                                <div class="option">
+                                    <input type="radio" id="ui_r" name="user_interaction" value="R">
+                                    <label for="ui_r">Required (R)<div class="description">User interaction</div></label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="metric-row">
+                        <div class="metric-group">
+                            <h3>Scope (S)</h3>
+                            <div class="metric-options">
+                                <div class="option">
+                                    <input type="radio" id="s_u" name="scope" value="U">
+                                    <label for="s_u">Unchanged (U)<div class="description">Same authority</div></label>
+                                </div>
+                                <div class="option">
+                                    <input type="radio" id="s_c" name="scope" value="C">
+                                    <label for="s_c">Changed (C)<div class="description">Different authority</div></label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="metric-group">
+                            <h3>Confidentiality Impact (C)</h3>
+                            <div class="metric-options">
+                                <div class="option">
+                                    <input type="radio" id="c_n" name="confidentiality" value="N">
+                                    <label for="c_n">None (N)<div class="description">No impact</div></label>
+                                </div>
+                                <div class="option">
+                                    <input type="radio" id="c_l" name="confidentiality" value="L">
+                                    <label for="c_l">Low (L)<div class="description">Limited loss</div></label>
+                                </div>
+                                <div class="option">
+                                    <input type="radio" id="c_h" name="confidentiality" value="H">
+                                    <label for="c_h">High (H)<div class="description">Total loss</div></label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="metric-row">
+                        <div class="metric-group">
+                            <h3>Integrity Impact (I)</h3>
+                            <div class="metric-options">
+                                <div class="option">
+                                    <input type="radio" id="i_n" name="integrity" value="N">
+                                    <label for="i_n">None (N)<div class="description">No impact</div></label>
+                                </div>
+                                <div class="option">
+                                    <input type="radio" id="i_l" name="integrity" value="L">
+                                    <label for="i_l">Low (L)<div class="description">Limited loss</div></label>
+                                </div>
+                                <div class="option">
+                                    <input type="radio" id="i_h" name="integrity" value="H">
+                                    <label for="i_h">High (H)<div class="description">Total loss</div></label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="metric-group">
+                            <h3>Availability Impact (A)</h3>
+                            <div class="metric-options">
+                                <div class="option">
+                                    <input type="radio" id="a_n" name="availability" value="N">
+                                    <label for="a_n">None (N)<div class="description">No impact</div></label>
+                                </div>
+                                <div class="option">
+                                    <input type="radio" id="a_l" name="availability" value="L">
+                                    <label for="a_l">Low (L)<div class="description">Limited loss</div></label>
+                                </div>
+                                <div class="option">
+                                    <input type="radio" id="a_h" name="availability" value="H">
+                                    <label for="a_h">High (H)<div class="description">Total loss</div></label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="actions">
+                        <button type="submit" class="calculate-btn" id="calculateBtn">Calculate CVSS Score</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Right: Results -->
+            <div class="card results-section">
+                <div id="results" style="display: none;">
+                    <div class="score">
+                        <div class="score-value" id="scoreValue">0.0</div>
+                        <div class="severity-badge" id="severityBadge">None</div>
+                    </div>
+
+                    <div class="scores-grid">
+                        <div class="score-card">
+                            <h4>Impact Score</h4>
+                            <div class="val" id="impactScore">0.0</div>
+                        </div>
+                        <div class="score-card">
+                            <h4>Exploitability</h4>
+                            <div class="val" id="exploitabilityScore">0.0</div>
+                        </div>
+                    </div>
+
+                    <div class="vector-string" id="vectorString">CVSS:3.1/AV:_/AC:_/PR:_/UI:_/S:_/C:_/I:_/A:_</div>
+                </div>
+
+                <div id="loading" style="display: none;" class="loading">Calculating...</div>
+                <div id="error" style="display: none;" class="error-message">Error calculating CVSS score</div>
+                <div id="instructions" class="loading">Select all metrics to calculate the score.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('cvssForm');
+        const calculateBtn = document.getElementById('calculateBtn');
+        const results = document.getElementById('results');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const instructions = document.getElementById('instructions');
+
+        function checkFormCompletion() {
+            const requiredFields = [
+                'attack_vector', 'attack_complexity', 'privileges_required',
+                'user_interaction', 'scope', 'confidentiality', 'integrity', 'availability'
+            ];
+            let allSelected = true;
+            for (let field of requiredFields) {
+                if (!document.querySelector(`input[name="${field}"]:checked`)) { allSelected = false; break; }
+            }
+            calculateBtn.disabled = !allSelected;
+            if (allSelected) { instructions.style.display = 'none'; } 
+            else { instructions.style.display = 'block'; results.style.display = 'none'; error.style.display = 'none'; }
+        }
+
+        document.querySelectorAll('input[type="radio"]').forEach(r => r.addEventListener('change', checkFormCompletion));
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            loading.style.display = 'block'; results.style.display = 'none'; error.style.display = 'none'; instructions.style.display = 'none'; calculateBtn.disabled = true;
+            try {
+                const formData = new FormData(form); const data = {}; for (let [k, v] of formData.entries()) { data[k] = v; }
+                const response = await fetch('/calculate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+                if (!response.ok) { throw new Error('Network response was not ok'); }
+                const result = await response.json(); displayResults(result);
+            } catch (err) {
+                error.style.display = 'block'; error.textContent = 'Error calculating CVSS score. Please try again.';
+            } finally { loading.style.display = 'none'; calculateBtn.disabled = false; }
+        });
+
+        function displayResults(result) {
+            document.getElementById('scoreValue').textContent = result.base_score.toFixed(1);
+            document.getElementById('impactScore').textContent = result.impact_score.toFixed(1);
+            document.getElementById('exploitabilityScore').textContent = result.exploitability_score.toFixed(1);
+            document.getElementById('vectorString').textContent = result.vector_string;
+            const severityBadge = document.getElementById('severityBadge');
+            severityBadge.textContent = result.severity; severityBadge.className = 'severity-badge severity-' + result.severity.toLowerCase();
+            results.style.display = 'block';
+        }
+
+        checkFormCompletion();
+    </script>
+</body>
+</html>
+
